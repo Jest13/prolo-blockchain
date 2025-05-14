@@ -1687,7 +1687,7 @@ bool Blockchain::create_block_template(block& b, const crypto::hash *from_block,
   CHECK_AND_ASSERT_MES(diffic, false, "difficulty overhead.");
 
   size_t txs_weight;
-  uint64_t fee;
+  uint64_t fee = 0; // Set fee to 0 to remove transaction fees
   if (!m_tx_pool.fill_block_template(b, median_weight, already_generated_coins, txs_weight, fee, expected_reward, b.major_version))
   {
     return false;
@@ -1706,7 +1706,7 @@ bool Blockchain::create_block_template(block& b, const crypto::hash *from_block,
     }
     tx_memory_pool::tx_details &cur_tx = cur_res->second;
     real_txs_weight += cur_tx.weight;
-    real_fee += cur_tx.fee;
+    real_fee = 0; // Set real_fee to 0
     if (cur_tx.weight != get_transaction_weight(cur_tx.tx))
     {
       LOG_ERROR("Creating block template: error: invalid transaction weight");
@@ -1718,16 +1718,16 @@ bool Blockchain::create_block_template(block& b, const crypto::hash *from_block,
       {
         LOG_ERROR("Creating block template: error: cannot get inputs amount");
       }
-      else if (cur_tx.fee != inputs_amount - get_outs_money_amount(cur_tx.tx))
+      else if (cur_tx.fee != 0) // Check fee is 0
       {
-        LOG_ERROR("Creating block template: error: invalid fee");
+        LOG_ERROR("Creating block template: error: fee must be 0");
       }
     }
     else
     {
-      if (cur_tx.fee != cur_tx.tx.rct_signatures.txnFee)
+      if (cur_tx.fee != 0) // Check fee is 0
       {
-        LOG_ERROR("Creating block template: error: invalid fee");
+        LOG_ERROR("Creating block template: error: fee must be 0"); 
       }
     }
   }
@@ -1735,9 +1735,9 @@ bool Blockchain::create_block_template(block& b, const crypto::hash *from_block,
   {
     LOG_ERROR("Creating block template: error: wrongly calculated transaction weight");
   }
-  if (fee != real_fee)
+  if (fee != 0) // Check fee is 0
   {
-    LOG_ERROR("Creating block template: error: wrongly calculated fee");
+    LOG_ERROR("Creating block template: error: fee must be 0");
   }
   MDEBUG("Creating block template: height " << height <<
       ", median weight " << median_weight <<
@@ -1753,7 +1753,7 @@ bool Blockchain::create_block_template(block& b, const crypto::hash *from_block,
   //make blocks coin-base tx looks close to real coinbase tx to get truthful blob weight
   uint8_t hf_version = b.major_version;
   size_t max_outs = hf_version >= 4 ? 1 : 11;
-  bool r = construct_miner_tx(height, median_weight, already_generated_coins, txs_weight, fee, miner_address, b.miner_tx, ex_nonce, max_outs, hf_version);
+  bool r = construct_miner_tx(height, median_weight, already_generated_coins, txs_weight, 0, miner_address, b.miner_tx, ex_nonce, max_outs, hf_version); // Set fee to 0
   CHECK_AND_ASSERT_MES(r, false, "Failed to construct miner tx, first chance");
   cumulative_weight = txs_weight + get_transaction_weight(b.miner_tx);
 #if defined(DEBUG_CREATE_BLOCK_TEMPLATE)
@@ -1762,7 +1762,7 @@ bool Blockchain::create_block_template(block& b, const crypto::hash *from_block,
 #endif
   for (size_t try_count = 0; try_count != 10; ++try_count)
   {
-    r = construct_miner_tx(height, median_weight, already_generated_coins, cumulative_weight, fee, miner_address, b.miner_tx, ex_nonce, max_outs, hf_version);
+    r = construct_miner_tx(height, median_weight, already_generated_coins, cumulative_weight, 0, miner_address, b.miner_tx, ex_nonce, max_outs, hf_version); // Set fee to 0
 
     CHECK_AND_ASSERT_MES(r, false, "Failed to construct miner tx, second chance");
     size_t coinbase_weight = get_transaction_weight(b.miner_tx);
